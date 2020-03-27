@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "format-check": "cargo fmt -- --check && prettier --check .",
+    "format": "cargo fmt && prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^2.0.2",
+    "prettier-plugin-toml": "^0.3.1"
+  }
+}

@@ -1,0 +1,44 @@
+on: push
+
+env:
+  # TODO extract this value automatically from cargo build output or something
+  BIN_NAME: jetline
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - nightly
+        os:
+          - windows-latest
+          - macos-latest
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: configure rust toolchain
+        run: |
+          rustup set profile default
+          rustup toolchain install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+      - name: check formatting
+        run: |
+          npm ci
+          npm run format-check
+      - name: run cargo
+        run: |
+          # run clippy first for now to be safe https://github.com/rust-lang/rust-clippy/issues/2604
+          cargo clippy --verbose --release -- -D warnings
+          cargo build --verbose --release
+          cargo test --verbose --release
+      - name: collect artifacts
+        shell: bash
+        run: |
+          mkdir artifacts
+          cp target/release/$BIN_NAME artifacts || cp target/release/$BIN_NAME.exe artifacts
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.BIN_NAME }}-${{ github.run_id }}-rust-${{ matrix.rust }}-${{ matrix.os }}
+          path: artifacts
