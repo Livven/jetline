@@ -1,5 +1,6 @@
 use colored::*;
 use git2::Repository;
+use itertools::Itertools;
 use std::env;
 
 const TERM_BG: Color = Color::Black;
@@ -33,13 +34,31 @@ fn main() {
         .to_string()
     };
 
-    let current_ref = (|| {
+    // TODO show branch name (i.e. "master") when there are no commits yet
+    let git_info = (|| {
         let repo = Repository::discover(&full_path).ok()?;
         let head = repo.head().ok()?;
-        head.shorthand().map(|shorthand| shorthand.to_string())
+        let branch_name = if head.is_branch() {
+            Some(head.shorthand()?.to_string())
+        } else {
+            None
+        };
+        let commit_sha = head.target()?;
+        let tracking = (|| {
+            let upstream_name = repo.branch_upstream_name(head.name()?).ok()?;
+            let upstream = repo.find_reference(upstream_name.as_str()?).ok()?;
+            let (ahead, behind) = repo
+                .graph_ahead_behind(commit_sha, upstream.target()?)
+                .ok()?;
+            Some(Tracking { ahead, behind })
+        })();
+        Some(GitInfo {
+            sha: commit_sha.to_string(),
+            branch: branch_name.map(|name| Branch { name, tracking }),
+        })
     })();
 
-    let all_entries = [
+    let entries = vec![
         match exit_code {
             Some(0) => None,
             _ => Some(Entry {
@@ -53,16 +72,38 @@ fn main() {
             fg: POWERLINE_FG,
             bg: Color::Blue,
         }),
-        current_ref.map(|current_ref| Entry {
-            text: format!(" {}", current_ref),
+        git_info.map(|git_info| Entry {
+            text: {
+                vec![
+                    Some("".to_string()),
+                    Some(match &git_info.branch {
+                        Some(branch) => branch.name.to_string(),
+                        None => git_info.sha[..7].to_string(),
+                    }),
+                    git_info.branch.map(|branch| match branch.tracking {
+                        Some(Tracking {
+                            ahead: 0,
+                            behind: 0,
+                        }) => "≣".to_string(),
+                        Some(tracking) => [("↑", tracking.ahead), ("↓", tracking.behind)]
+                            .iter()
+                            .filter(|(_, count)| count != &0usize)
+                            .map(|(symbol, count)| format!("{}{}", symbol, count))
+                            .join(""),
+                        None => "≢".to_string(),
+                    }),
+                ]
+                .into_iter()
+                .filter_map(|x| x)
+                .join(" ")
+            },
             fg: POWERLINE_FG,
             bg: Color::Yellow,
         }),
-    ];
-    let entries = all_entries
-        .iter()
-        .filter_map(|x| x.as_ref())
-        .collect::<Vec<_>>();
+    ]
+    .into_iter()
+    .filter_map(|x| x)
+    .collect_vec();
 
     let mut prompt = String::from("\n");
     for (i, entry) in entries.iter().enumerate() {
@@ -75,6 +116,21 @@ fn main() {
     prompt.push_str(&format!("\n{} ", "▶".bright_black()));
 
     println!("{}", prompt);
+}
+
+struct GitInfo {
+    sha: String,
+    branch: Option<Branch>,
+}
+
+struct Branch {
+    name: String,
+    tracking: Option<Tracking>,
+}
+
+struct Tracking {
+    ahead: usize,
+    behind: usize,
 }
 
 struct Entry {
