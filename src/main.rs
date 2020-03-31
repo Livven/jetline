@@ -1,5 +1,5 @@
 use colored::*;
-use git2::Repository;
+use git2::{Repository, StatusOptions};
 use itertools::Itertools;
 use std::env;
 
@@ -44,6 +44,7 @@ fn main() {
             None
         };
         let commit_sha = head.target()?;
+
         let tracking = (|| {
             let upstream_name = repo.branch_upstream_name(head.name()?).ok()?;
             let upstream = repo.find_reference(upstream_name.as_str()?).ok()?;
@@ -52,9 +53,21 @@ fn main() {
                 .ok()?;
             Some(Tracking { ahead, behind })
         })();
+
+        // TODO distinguish between staged and unstaged changes
+        let changes = repo
+            .statuses(Some(
+                &mut StatusOptions::new()
+                    .include_untracked(true)
+                    .recurse_untracked_dirs(true),
+            ))
+            .ok()?
+            .len();
+
         Some(GitInfo {
             sha: commit_sha.to_string(),
             branch: branch_name.map(|name| Branch { name, tracking }),
+            changes,
         })
     })();
 
@@ -89,16 +102,23 @@ fn main() {
                             .iter()
                             .filter(|(_, count)| count != &0usize)
                             .map(|(symbol, count)| format!("{}{}", symbol, count))
-                            .join(""),
+                            .join(" "),
                         None => "≢".to_string(),
                     }),
+                    match git_info.changes {
+                        0 => None,
+                        changes => Some(format!("±{}", changes)),
+                    },
                 ]
                 .into_iter()
                 .filter_map(|x| x)
                 .join(" ")
             },
             fg: POWERLINE_FG,
-            bg: Color::Yellow,
+            bg: match git_info.changes {
+                0 => Color::Green,
+                _ => Color::Yellow,
+            },
         }),
     ]
     .into_iter()
@@ -121,6 +141,7 @@ fn main() {
 struct GitInfo {
     sha: String,
     branch: Option<Branch>,
+    changes: usize,
 }
 
 struct Branch {
