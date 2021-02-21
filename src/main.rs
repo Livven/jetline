@@ -111,7 +111,7 @@ fn main() {
                     },
                 ]
                 .into_iter()
-                .filter_map(|x| x)
+                .flatten()
                 .join(" ")
             },
             fg: POWERLINE_FG,
@@ -122,7 +122,7 @@ fn main() {
         }),
     ]
     .into_iter()
-    .filter_map(|x| x)
+    .flatten()
     .collect_vec();
 
     let mut prompt = String::from("\n");
