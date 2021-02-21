@@ -1,7 +1,11 @@
-on: push
+name: ci
+
+on:
+  push:
+    branches:
+      - "**"
 
 env:
-  # TODO extract this value automatically from cargo build output or something
   BIN_NAME: jetline
 
 jobs:

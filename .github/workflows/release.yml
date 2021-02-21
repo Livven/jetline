@@ -1,0 +1,66 @@
+name: release
+
+on:
+  push:
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+*
+
+env:
+  BIN_NAME: jetline
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      upload-url: ${{ steps.create-release.outputs.upload_url }}
+    steps:
+      - id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: true
+  build:
+    needs: prepare
+    strategy:
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            extension: .exe
+          - name: mac
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - name: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          profile: minimal
+          override: true
+      - name: Run cargo build
+        run: cargo build --verbose --release --target ${{ matrix.target }}
+      - name: Create artifact
+        shell: bash
+        run: |
+          version="${GITHUB_REF#refs/tags/v}"
+          artifact="$BIN_NAME-$version-${{ matrix.name }}.zip"
+          echo "ARTIFACT=$artifact" >> "$GITHUB_ENV"
+          cd "target/${{ matrix.target }}/release"
+          7z a "../../../$artifact" "$BIN_NAME${{ matrix.extension }}"
+      - uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.prepare.outputs.upload-url }}
+          asset_path: ${{ env.ARTIFACT }}
+          asset_name: ${{ env.ARTIFACT }}
+          asset_content_type: application/zip
