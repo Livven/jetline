@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       upload-url: ${{ steps.create-release.outputs.upload_url }}
+      version: ${{ steps.set-variables.outputs.version }}
     steps:
       - id: create-release
         uses: actions/create-release@v1
@@ -22,6 +23,9 @@ jobs:
           tag_name: ${{ github.ref }}
           release_name: ${{ github.ref }}
           draft: true
+      - id: set-variables
+        name: Set variables
+        run: echo "::set-output name=version::${GITHUB_REF#refs/tags/v}"
   build:
     needs: prepare
     strategy:
@@ -51,8 +55,7 @@ jobs:
       - name: Create artifact
         shell: bash
         run: |
-          version="${GITHUB_REF#refs/tags/v}"
-          artifact="$BIN_NAME-$version-${{ matrix.name }}.zip"
+          artifact="$BIN_NAME-${{ needs.prepare.outputs.version }}-${{ matrix.name }}.zip"
           echo "ARTIFACT=$artifact" >> "$GITHUB_ENV"
           cd "target/${{ matrix.target }}/release"
           7z a "../../../$artifact" "$BIN_NAME${{ matrix.extension }}"
@@ -64,3 +67,20 @@ jobs:
           asset_path: ${{ env.ARTIFACT }}
           asset_name: ${{ env.ARTIFACT }}
           asset_content_type: application/zip
+  scoop:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set version
+        run: |
+          sed -i "s/\$VERSION/${{ needs.prepare.outputs.version }}/g" scoop/jetline.json
+          cat scoop/jetline.json
+      - uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.prepare.outputs.upload-url }}
+          asset_path: scoop/jetline.json
+          asset_name: jetline.json
+          asset_content_type: application/json

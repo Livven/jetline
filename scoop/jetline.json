@@ -1,0 +1,5 @@
+{
+  "version": "$VERSION",
+  "url": "https://github.com/Livven/jetline/releases/download/v$VERSION/jetline-$VERSION-windows.zip",
+  "bin": "jetline.exe"
+}
