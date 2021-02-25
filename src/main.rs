@@ -1,3 +1,4 @@
+use chrono::Local;
 use colored::*;
 use git2::{Repository, StatusOptions};
 use itertools::Itertools;
@@ -75,7 +76,9 @@ fn main() {
         match exit_code {
             Some(0) => None,
             _ => Some(Entry {
-                text: "✖".to_string(),
+                text: exit_code.map_or("✖".to_string(), |exit_code| {
+                    format!("✖ {}", exit_code.to_string())
+                }),
                 fg: Color::Red,
                 bg: Color::BrightWhite,
             }),
@@ -133,7 +136,11 @@ fn main() {
         let next_bg = entries.get(i + 1).map_or(TERM_BG, |next| next.bg);
         prompt.push_str(&entry.powerline(next_bg));
     }
-    prompt.push_str(&format!("\n{} ", "▶".bright_black()));
+    prompt.push_str(&format!(
+        "\n{} {} ",
+        Local::now().format("%H:%M:%S").to_string().bright_black(),
+        "▶".bright_black()
+    ));
 
     println!("{}", prompt);
 }
