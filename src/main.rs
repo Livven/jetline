@@ -12,11 +12,13 @@ fn main() {
     // color detection can be unreliable (e.g. for PowerShell prompts) so just force it on
     colored::control::set_override(true);
 
-    let exit_code = env::args().nth(1).map_or(
+    let mut args = env::args().skip(1);
+    let exit_code = args.next().map_or(
         // exit code argument is optional so treat its absence as success
         Some(0),
         |value| value.parse::<i32>().ok(),
     );
+    let duration = args.next().and_then(|value| value.parse::<f64>().ok());
 
     // TODO handle invalid working directory?
     let full_path = env::current_dir().unwrap();
@@ -83,6 +85,11 @@ fn main() {
                 bg: Color::BrightWhite,
             }),
         },
+        duration.map(|duration| Entry {
+            text: format_duration(duration),
+            fg: POWERLINE_FG,
+            bg: Color::Cyan,
+        }),
         Some(Entry {
             text: path_str,
             fg: POWERLINE_FG,
@@ -138,7 +145,7 @@ fn main() {
     }
     prompt.push_str(&format!(
         "\n{} {} ",
-        Local::now().format("%H:%M:%S").to_string().bright_black(),
+        Local::now().format("%H:%M").to_string().bright_black(),
         "▶".bright_black()
     ));
 
@@ -172,5 +179,48 @@ impl Entry {
         let content = format!(" {} ", self.text).color(self.fg).on_color(self.bg);
         let separator = POWERLINE_SEP.color(self.bg).on_color(next_bg);
         format!("{}{}", content, separator)
+    }
+}
+
+fn format_duration(millis: f64) -> String {
+    let seconds = millis / 1000.0;
+    let minutes = seconds / 60.0;
+    if seconds < 10.0 {
+        format!("{:.2}s", seconds)
+    } else if seconds < 60.0 {
+        format!("{:.1}s", seconds)
+    } else if minutes < 10.0 {
+        format!("{:.2}m", minutes)
+    } else if minutes < 100.0 {
+        format!("{:.1}m", minutes)
+    } else {
+        format!("{:.0}m", minutes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_duration() {
+        assert_eq!(format_duration(0.0), "0.00s");
+        assert_eq!(format_duration(55.0), "0.06s");
+        assert_eq!(format_duration(100.0), "0.10s");
+
+        assert_eq!(format_duration(0.99 * 1000.0), "0.99s");
+        assert_eq!(format_duration(1.00 * 1000.0), "1.00s");
+        assert_eq!(format_duration(9.99 * 1000.0), "9.99s");
+        assert_eq!(format_duration(10.0 * 1000.0), "10.0s");
+        assert_eq!(format_duration(59.9 * 1000.0), "59.9s");
+        assert_eq!(format_duration(60.0 * 1000.0), "1.00m");
+
+        assert_eq!(format_duration(9.99 * 60.0 * 1000.0), "9.99m");
+        assert_eq!(format_duration(10.0 * 60.0 * 1000.0), "10.0m");
+        assert_eq!(format_duration(59.9 * 60.0 * 1000.0), "59.9m");
+        assert_eq!(format_duration(60.0 * 60.0 * 1000.0), "60.0m");
+        assert_eq!(format_duration(99.9 * 60.0 * 1000.0), "99.9m");
+        assert_eq!(format_duration(100.0 * 60.0 * 1000.0), "100m");
+        assert_eq!(format_duration(999.9 * 60.0 * 1000.0), "1000m");
     }
 }
