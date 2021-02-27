@@ -9,6 +9,22 @@ env:
   BIN_NAME: jetline
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: default
+          override: true
+      - name: Check formatting
+        run: |
+          npm ci
+          npm run format-check
+      - name: Run clippy
+        run: |
+          cargo clippy -- -D warnings
   build:
     strategy:
       matrix:
@@ -22,22 +38,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - name: configure rust toolchain
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          profile: minimal
+          override: true
+      - name: Build and test
         run: |
-          rustup set profile default
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
-      - name: check formatting
-        run: |
-          npm ci
-          npm run format-check
-      - name: run cargo
-        run: |
-          # run clippy first for now to be safe https://github.com/rust-lang/rust-clippy/issues/2604
-          cargo clippy --verbose --release -- -D warnings
           cargo build --verbose --release
           cargo test --verbose --release
-      - name: collect artifacts
+      - name: Collect artifacts
         shell: bash
         run: |
           mkdir artifacts
