@@ -8,6 +8,6 @@ edition = "2018"
 [dependencies]
 chrono = "0.4.19"
 colored = "2.0.0"
-dirs = "3.0.1"
+dirs = "3.0.2"
 git2 = "0.13.17"
 itertools = "0.10.0"
