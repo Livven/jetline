@@ -4,7 +4,7 @@
     "format": "cargo fmt && prettier --write ."
   },
   "devDependencies": {
-    "prettier": "^2.2.1",
+    "prettier": "^2.3.0",
     "prettier-plugin-toml": "^0.3.1"
   }
 }
